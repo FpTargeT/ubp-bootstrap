@@ -9,7 +9,7 @@ It contains no host name, address or secret. Everything private stays in the ubp
 Pick a release tag (never `main`), then:
 
 ```bash
-TAG=v0.1.1
+TAG=v1.0.0
 cd "$(mktemp -d)" && curl -fsSLO "https://raw.githubusercontent.com/FpTargeT/ubp-bootstrap/$TAG/bootstrap.sh" \
   && curl -fsSLO "https://raw.githubusercontent.com/FpTargeT/ubp-bootstrap/$TAG/SHA256SUMS" \
   && shasum -a 256 -c SHA256SUMS && less bootstrap.sh && bash bootstrap.sh
@@ -18,7 +18,7 @@ cd "$(mktemp -d)" && curl -fsSLO "https://raw.githubusercontent.com/FpTargeT/ubp
 That is the careful way: download, check the checksum, read it, run it. The one-liner, if you trust the tag:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/FpTargeT/ubp-bootstrap/v0.1.1/bootstrap.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/FpTargeT/ubp-bootstrap/v1.0.0/bootstrap.sh)"
 ```
 
 `bash -c "$(curl ...)"` rather than `curl | bash`: the whole file is downloaded before anything runs, and the
@@ -28,15 +28,16 @@ prompts keep working.
 
 | Option | Meaning |
 |---|---|
-| `--role dev\|admin\|user\|server\|generic` | role of this account; asked if omitted |
-| `--yes` | no questions (needs `--role`) |
-| `--keep-gh` | stay signed in to GitHub afterwards (default: signed out unless the role is `dev`) |
+| `--role dev` | the only role bootstrap sets up (default); any other role is refused |
+| `--yes` | no questions |
+| `--keep-gh` | stay signed in to GitHub afterwards (default: signed out if the account turns out to have another role than `dev`) |
 | `--dry-run` | print what would happen, change nothing |
 
-## On someone else's Mac
+## On someone else's Mac, a server, or another account
 
-Run it yourself, at the keyboard, with `--role user` (or `admin`). It signs you out of `gh` at the end, so no token of
-yours stays on that machine. Later updates reach it as a payload (`ubp package` on your dev Mac), never through GitHub.
+Not with this script: it clones the whole private repository (private addresses, dev roles), which only a dev account may
+hold. Run `ubp package <alias>` on your dev Mac and install that role-filtered payload (`ubp root-install` gives root its own
+copy); servers go through `deploy-executable.sh`.
 
 ## Releasing (owner only)
 

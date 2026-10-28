@@ -11,17 +11,17 @@
 #   1. Mac: install Homebrew (installer pinned to a commit + sha256) if missing.   Linux: use apt.
 #   2. Install the GitHub CLI (gh) and sign in (web flow, your MFA/passkey).
 #   3. Clone the private ubp repository at the release tag this script is pinned to.
-#   4. Run `ubp init` (asks the role of this account) and `ubp sync`.
-#   5. On a machine that is not yours (role other than dev): sign gh out again.
+#   4. Run `ubp init --role dev` and `ubp sync`. Other roles never get a clone: they install a payload.
+#   5. If the account turns out to be registered with another role: sign gh out again.
 #
-# Options: --role R | --yes (no questions; needs --role) | --keep-gh | --dry-run | --help
+# Options: --role dev (the only role; default) | --yes (no questions) | --keep-gh | --dry-run | --help
 # Runs under macOS's stock bash 3.2: no associative arrays, no mapfile, no ${var,,}.
 # =============================================================================
 set -euo pipefail
 trap 'echo "Gracefully stopped by user (exit 130)." >&2; exit 130' INT
 
 # Set by bootstrap/make-release.sh when a release is cut. A bootstrap tag installs exactly one ubp tag.
-UBP_TAG='v0.1.1'
+UBP_TAG='v0.1.2'
 UBP_REPO='FpTargeT/uniform_bash_prompt_kit'
 UBP_DIR="$HOME/.local/share/ubp"
 
@@ -30,7 +30,7 @@ BREW_INSTALLER_COMMIT='a2fe82ef3a9ec7a5c72a559c09676256d6f354f6'
 BREW_INSTALLER_SHA256='5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148'
 BREW_INSTALLER_URL="https://raw.githubusercontent.com/Homebrew/install/$BREW_INSTALLER_COMMIT/install.sh"
 
-ROLE=""
+ROLE="dev"
 ASSUME_YES=0
 KEEP_GH=0
 DRY_RUN=0
@@ -68,8 +68,22 @@ detect_os() {
     esac
 }
 
+# Apple Silicon: /opt/homebrew, Intel: /usr/local. Brew can be installed yet absent from PATH in a fresh shell
+# (always so on Apple Silicon), which would trigger a needless second install and make `brew install gh` fail.
+load_brew_env() {
+    local prefix
+    # UBP_FAKE_BREW_PREFIXES: test hook, so a test never reaches the host's real Homebrew.
+    for prefix in ${UBP_FAKE_BREW_PREFIXES-/opt/homebrew /usr/local}; do
+        if [[ -x "$prefix/bin/brew" ]]; then
+            eval "$("$prefix/bin/brew" shellenv)"
+            return 0
+        fi
+    done
+}
+
 ensure_brew_mac() {
     local tmp got
+    load_brew_env
     if command -v brew >/dev/null 2>&1; then
         say "Homebrew already installed."
         return 0
@@ -92,12 +106,7 @@ ensure_brew_mac() {
         /bin/bash "$tmp/install.sh"
     fi
     rm -rf "$tmp"
-    # Apple Silicon: /opt/homebrew, Intel: /usr/local.
-    if [[ -x /opt/homebrew/bin/brew ]]; then
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-    elif [[ -x /usr/local/bin/brew ]]; then
-        eval "$(/usr/local/bin/brew shellenv)"
-    fi
+    load_brew_env
 }
 
 ensure_gh() {
@@ -171,14 +180,22 @@ main() {
         esac
     done
     if [[ "$UBP_TAG" == "v0.0.0" ]]; then
-        say "NOTE: this copy is not a release (UBP_TAG is unset): use a tagged copy for a real install."
+        # Placeholder tag: only bootstrap/make-release.sh pins a real one. Never act on a machine with it.
+        (( DRY_RUN )) || die "this copy is not a release (UBP_TAG is the placeholder v0.0.0): use a tagged copy, or --dry-run"
+        say "NOTE: this copy is not a release (UBP_TAG is the placeholder v0.0.0); dry-run only."
+    fi
+    if [[ -n "$ROLE" ]]; then
+        case "$ROLE" in
+            dev) ;;
+            admin|user|server|generic)
+                # This path clones the whole private repo (hosts.bash, dev roles): only a dev account may hold that.
+                die "bootstrap is for dev accounts only: other roles get a role-filtered payload (ubp package <alias>, ubp root-install)" ;;
+            *) die "invalid role (dev|admin|user|server|generic)" ;;
+        esac
     fi
     os="$(detect_os)" || die "unsupported system: $(uname -s) (macOS and Linux/WSL only)"
     if [[ "$(id -u)" == "0" ]]; then
         die "do not run this as root: Homebrew refuses it and your own account is the one to set up"
-    fi
-    if (( ASSUME_YES )) && [[ -z "$ROLE" ]]; then
-        die "--yes needs --role (dev|admin|user|server|generic): nothing to ask"
     fi
 
     say "ubp-bootstrap: this will set up $USER on this $os machine from $UBP_REPO at $UBP_TAG."
@@ -198,7 +215,7 @@ main() {
     clone_ubp
 
     step "Registering this account and syncing"
-    if [[ -n "$ROLE" ]]; then role_args=(--role "$ROLE"); fi
+    role_args=(--role "$ROLE")
     if (( ASSUME_YES )); then assume=(--yes); fi
     if (( DRY_RUN )); then
         say "[dry-run] $UBP_DIR/bin/ubp init ${role_args[*]-} ${assume[*]-}"
