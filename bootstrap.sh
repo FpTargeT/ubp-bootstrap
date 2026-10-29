@@ -21,7 +21,7 @@ set -euo pipefail
 trap 'echo "Gracefully stopped by user (exit 130)." >&2; exit 130' INT
 
 # Set by bootstrap/make-release.sh when a release is cut. A bootstrap tag installs exactly one ubp tag.
-UBP_TAG='v0.1.2'
+UBP_TAG='v0.1.3'
 UBP_REPO='FpTargeT/uniform_bash_prompt_kit'
 UBP_DIR="$HOME/.local/share/ubp"
 
