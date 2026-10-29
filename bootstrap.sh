@@ -21,7 +21,7 @@ set -euo pipefail
 trap 'echo "Gracefully stopped by user (exit 130)." >&2; exit 130' INT
 
 # Set by bootstrap/make-release.sh when a release is cut. A bootstrap tag installs exactly one ubp tag.
-UBP_TAG='v0.1.6'
+UBP_TAG='v0.1.7'
 UBP_REPO='FpTargeT/uniform_bash_prompt_kit'
 UBP_DIR="$HOME/.local/share/ubp"
 
@@ -35,9 +35,11 @@ ASSUME_YES=0
 KEEP_GH=0
 DRY_RUN=0
 
-say()  { printf '%s\n' "$*" >&2; }
-step() { printf '\n==> %s\n' "$*" >&2; }
-die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+# Same console format as the ubp CLI: "<emoji> [TAG] message" on stderr.
+say()  { printf '✅ [INFO] %s\n' "$*" >&2; }
+step() { printf '🚀 [INFO] %s\n' "$*" >&2; }
+warn() { printf '⚠️  [WARNING] %s\n' "$*" >&2; }
+die()  { printf '❌ [ERR] %s\n' "$*" >&2; exit 1; }
 
 # Print what would change, change nothing.
 run() {
@@ -182,7 +184,7 @@ main() {
     if [[ "$UBP_TAG" == "v0.0.0" ]]; then
         # Placeholder tag: only bootstrap/make-release.sh pins a real one. Never act on a machine with it.
         (( DRY_RUN )) || die "this copy is not a release (UBP_TAG is the placeholder v0.0.0): use a tagged copy, or --dry-run"
-        say "NOTE: this copy is not a release (UBP_TAG is the placeholder v0.0.0); dry-run only."
+        warn "this copy is not a release (UBP_TAG is the placeholder v0.0.0); dry-run only."
     fi
     if [[ -n "$ROLE" ]]; then
         case "$ROLE" in
@@ -229,7 +231,7 @@ main() {
     account_role="$("$UBP_DIR/bin/ubp" whoami | awk '{print $2}')" || account_role=""
     if [[ "$account_role" != "dev" ]] && (( ! KEEP_GH )); then
         step "Signing gh out (this is not a dev machine; use --keep-gh to stay signed in)"
-        gh auth logout --hostname github.com || say "could not sign out automatically: run: gh auth logout"
+        gh auth logout --hostname github.com || warn "could not sign out automatically: run: gh auth logout"
     fi
     say "Done. Open a new terminal. Check this account any time with: ubp doctor"
 }
